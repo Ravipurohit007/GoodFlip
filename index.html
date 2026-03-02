@@ -100,6 +100,7 @@ th:hover{color:var(--accent)}td{padding:9px 12px;border-bottom:1px solid var(--b
 <div class="tab-content" id="tab-dayschedule">
 <div class="filters" id="dsFilters">
 <div class="fg"><span class="fg-label">CGM Type</span><button class="fb active" data-dc="All">All</button><button class="fb" data-dc="GoodFlip">GoodFlip</button><button class="fb" data-dc="Diasens">Diasens</button></div>
+<div class="fg" id="dMG"><span class="fg-label">Month</span><button class="fb active" data-dm="All">All</button></div>
 <div class="fg"><span class="fg-label">Status</span><button class="fb active" data-ds="All">All</button><button class="fb" data-ds="completed">Completed</button><button class="fb" data-ds="noshow">No-Show</button><button class="fb" data-ds="confirmed">Upcoming</button></div>
 </div>
 <div class="main">
@@ -167,14 +168,28 @@ function fSort(){fFlt.sort((a,b)=>{let va=a[fSk],vb=b[fSk];if(fSk==='closingHrs'
 function fTbl(){const q=document.getElementById('fSr').value.toLowerCase();let r=fFlt;if(q)r=r.filter(x=>(x.id+' '+x.summary+' '+x.level1+' '+x.level3+' '+x.status+' '+x.tags).toLowerCase().includes(q));const tp=Math.ceil(r.length/fPS)||1;if(fPg>tp)fPg=tp;const s=(fPg-1)*fPS,p=r.slice(s,s+fPS);document.getElementById('fTb').innerHTML=p.map(r=>'<tr><td style="font-weight:500;color:var(--accent)">'+e(r.id)+'</td><td title="'+e(r.summary)+'">'+e(r.summary)+'</td><td>'+e(r.tags)+'</td><td>'+e(r.level1)+'</td><td><span class="badge '+(r.level2==='Tech Issue'?'b-t':'b-n')+'">'+e(r.level2)+'</span></td><td title="'+e(r.level3)+'">'+e(r.level3)+'</td><td><span class="badge '+(r.status==='Closed'?'b-c':r.status==='Open'?'b-o':'b-w')+'">'+e(r.status)+'</span></td><td>'+e(r.created)+'</td><td>'+r.closingHrs+'</td></tr>').join('');pgn('fPg',tp,fPg,'fGp');}
 function fGp(p){fPg=p;fTbl();}
 // ========== DAYSCHEDULE ==========
-let dAllRaw=[],dFlt=[],dCh={},dSk='date',dSa=false,dPg=1,dCgm='All',dSts='All';const dPS=30;
+let dAllRaw=[],dFlt=[],dCh={},dSk='date',dSa=false,dPg=1,dCgm='All',dSts='All',dMon='All';const dPS=30;
 
-function initDS(data){dAllRaw=data;dApply();document.getElementById('dL').style.display='none';document.getElementById('dC').style.display='block';}
+function initDS(data){dAllRaw=data;dBuildMonths();dApply();document.getElementById('dL').style.display='none';document.getElementById('dC').style.display='block';}
 function loadDS(){Papa.parse(DS_URL,{download:true,header:true,skipEmptyLines:true,complete(res){const data=res.data.filter(r=>r.booking_id).map(r=>{const subj=r.subject||'';let ag='',inv='';if(subj.includes(' and ')){const p=subj.split(' and ');inv=p[0].trim();ag=p[1].split(':')[0].trim();}const sa=r.start_at||'';return{id:r.booking_id,date:sa.slice(0,10),time:sa.slice(11,16),invitee:inv||r.invitee_name||'',agent:ag,cgmType:(r.invitee_ans1||'').replace(' CGM',''),platform:r.location_name||'',status:r.status||'',duration:parseInt(r.duration)||0,email:r.invitee_email||'',note:(r.internal_note||'').replace(/<[^>]*>/g,'')};});initDS(data);},error(){initDS(DS_EMBED);}});setTimeout(()=>{if(!dAllRaw.length)initDS(DS_EMBED);},3000);}
+
+// Build month buttons dynamically
+function dBuildMonths(){
+  const months=[...new Set(dAllRaw.map(r=>r.date.slice(0,7)).filter(Boolean))].sort();
+  const mNames={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
+  const g=document.getElementById('dMG');
+  months.forEach(m=>{
+    const label=mNames[m.slice(5,7)]+' '+m.slice(0,4);
+    const b=document.createElement('button');b.className='fb';b.textContent=label;b.dataset.dm=m;
+    b.onclick=()=>{g.querySelectorAll('.fb').forEach(x=>x.className='fb');b.className='fb active';dMon=m;dPg=1;dApply();};
+    g.appendChild(b);
+  });
+}
 
 // Filters
 document.querySelectorAll('[data-dc]').forEach(b=>{b.onclick=()=>{document.querySelectorAll('[data-dc]').forEach(x=>x.className='fb');dCgm=b.dataset.dc;b.className='fb '+(dCgm==='GoodFlip'?'gf-active':dCgm==='Diasens'?'ds-active':'active');dPg=1;dApply();};});
 document.querySelectorAll('[data-ds]').forEach(b=>{b.onclick=()=>{document.querySelectorAll('[data-ds]').forEach(x=>x.className='fb');dSts=b.dataset.ds;b.className='fb active';dPg=1;dApply();};});
+document.querySelectorAll('[data-dm]').forEach(b=>{b.onclick=()=>{document.getElementById('dMG').querySelectorAll('.fb').forEach(x=>x.className='fb');b.className='fb active';dMon=b.dataset.dm;dPg=1;dApply();};});
 document.getElementById('dSr').oninput=()=>{dPg=1;dTbl();};
 document.querySelectorAll('th[data-dk]').forEach(th=>{th.onclick=()=>{const k=th.dataset.dk;if(dSk===k)dSa=!dSa;else{dSk=k;dSa=true;}dTbl();};});
 
@@ -182,19 +197,20 @@ function dApply(){
   let d=[...dAllRaw];
   if(dCgm!=='All')d=d.filter(r=>r.cgmType===dCgm);
   if(dSts!=='All')d=d.filter(r=>r.status===dSts);
+  if(dMon!=='All')d=d.filter(r=>r.date.startsWith(dMon));
   dFlt=d;dKPI();dSum();dCharts();dTbl();
   document.getElementById('headerInfo').textContent=dAllRaw.length+' bookings | DaySchedule';
 }
 
-function dKPI(){const d=dFlt,n=d.length,all=dAllRaw.length;
+function dKPI(){const d=dFlt,n=d.length;
   const comp=d.filter(r=>r.status==='completed').length,ns=d.filter(r=>r.status==='noshow').length,can=d.filter(r=>r.status==='canceled').length,conf=d.filter(r=>r.status==='confirmed').length;
   const gf=d.filter(r=>r.cgmType==='GoodFlip').length,ds=d.filter(r=>r.cgmType==='Diasens').length;
   const avgD=n?av(d.map(r=>r.duration)).toFixed(0):'–';
   const agents=[...new Set(d.map(r=>r.agent).filter(Boolean))];
   document.getElementById('dK').innerHTML=[
     kp('Total Bookings',n,'Filtered view'),
-    kp('GoodFlip',gf,'<span style="color:#3EDBB0">'+Math.round(gf/n*100)+'%</span> of total'),
-    kp('Diasens',ds,'<span style="color:#F0B839">'+Math.round(ds/n*100)+'%</span> of total'),
+    kp('GoodFlip',gf,n?'<span style="color:#3EDBB0">'+Math.round(gf/n*100)+'%</span> of total':''),
+    kp('Diasens',ds,n?'<span style="color:#F0B839">'+Math.round(ds/n*100)+'%</span> of total':''),
     kp('Completed',comp,n?Math.round(comp/n*100)+'% success':''),
     kp('No-Show',ns,n?Math.round(ns/n*100)+'%':''),
     kp('Upcoming',conf,'Confirmed'),
@@ -212,19 +228,19 @@ function dSum(){const d=dFlt,n=d.length,all=dAllRaw;
 
   document.getElementById('dSm').innerHTML='<h2>📅 Installation Summary</h2><div class="sum-grid" style="grid-template-columns:repeat(3,1fr)">'+
     '<div class="sc"><h3><span class="dot" style="background:var(--accent)"></span>Overview</h3><ul>'+
-      '<li>Total: <span class="hi">'+n+'</span> bookings since 23rd Feb</li>'+
-      '<li><span style="color:#3EDBB0;font-weight:600">GoodFlip</span>: '+gfAll.length+' bookings ('+gfComp+' completed, '+Math.round(gfComp/gfAll.length*100)+'%)</li>'+
+      '<li>Total: <span class="hi">'+n+'</span> bookings'+(dMon!=='All'?' ('+dMon+')':' since 23rd Feb')+'</li>'+
+      '<li><span style="color:#3EDBB0;font-weight:600">GoodFlip</span>: '+gfAll.length+' bookings ('+gfComp+' completed, '+Math.round(gfComp/(gfAll.length||1)*100)+'%)</li>'+
       '<li><span style="color:#F0B839;font-weight:600">Diasens</span>: '+dsAll.length+' bookings ('+dsComp+' completed'+(dsAll.length?', '+Math.round(dsComp/dsAll.length*100)+'%':'')+')</li>'+
-      '<li>Completion: <span class="'+(comp/n>.7?'hi':'wr')+'">'+Math.round(comp/n*100)+'%</span> | No-show: <span class="'+(ns/n>.15?'bd':'hi')+'">'+Math.round(ns/n*100)+'%</span></li>'+
+      '<li>Completion: <span class="'+(n&&comp/n>.7?'hi':'wr')+'">'+(n?Math.round(comp/n*100):0)+'%</span> | No-show: <span class="'+(n&&ns/n>.15?'bd':'hi')+'">'+(n?Math.round(ns/n*100):0)+'%</span></li>'+
     '</ul></div>'+
     '<div class="sc"><h3><span class="dot" style="background:var(--blue)"></span>Agent × CGM Type</h3><ul>'+
-      Object.entries(agS).map(([k,v])=>'<li><span class="hi">'+k+'</span>: '+v.t+' total — <span style="color:#3EDBB0">GF:'+v.gf+'</span> | <span style="color:#F0B839">DS:'+v.ds+'</span> | Done:'+v.c+' ('+Math.round(v.c/v.t*100)+'%)'+(v.ns?', <span class="bd">'+v.ns+' no-show</span>':'')+'</li>').join('')+
+      Object.entries(agS).map(([k,v])=>'<li><span class="hi">'+k+'</span>: '+v.t+' total — <span style="color:#3EDBB0">GF:'+v.gf+'</span> | <span style="color:#F0B839">DS:'+v.ds+'</span> | Done:'+v.c+' ('+Math.round(v.c/(v.t||1)*100)+'%)'+(v.ns?', <span class="bd">'+v.ns+' no-show</span>':'')+'</li>').join('')+
     '</ul></div>'+
     '<div class="sc"><h3><span class="dot" style="background:var(--accent)"></span>Notes</h3><ul>'+
       '<li>CGM installation started <span class="hi">27th Feb</span></li>'+
       '<li>Both <span class="hi">MS Teams & Google Meet</span> platforms used</li>'+
       '<li>WhatsApp video used as fallback when Teams fails</li>'+
-      '<li>Avg session: <span class="hi">~'+av(d.map(r=>r.duration)).toFixed(0)+' min</span></li>'+
+      '<li>Avg session: <span class="hi">~'+(n?av(d.map(r=>r.duration)).toFixed(0):'–')+' min</span></li>'+
       '<li>Booking volume ramping up — '+all.filter(r=>r.date>='2026-03-01').length+' bookings in March already</li>'+
     '</ul></div></div>';
 }
@@ -232,8 +248,7 @@ function dSum(){const d=dFlt,n=d.length,all=dAllRaw;
 function dCharts(){Object.values(dCh).forEach(c=>c.destroy());dCh={};const d=dFlt,all=dAllRaw;
   const dl={display:true,color:'#E4E8EF',font:{size:11,weight:600},anchor:'end',align:'top'};
 
-  // Daily stacked: GoodFlip vs Diasens
-  const dates=[...new Set(all.map(r=>r.date))].sort();
+  const dates=[...new Set(d.map(r=>r.date))].sort();
   const gfD=dates.map(dt=>d.filter(r=>r.date===dt&&r.cgmType==='GoodFlip').length);
   const dsD=dates.map(dt=>d.filter(r=>r.date===dt&&r.cgmType==='Diasens').length);
   dCh.daily=new Chart(document.getElementById('dDaily'),{type:'bar',data:{labels:dates.map(d=>d.slice(5)),datasets:[
@@ -241,30 +256,24 @@ function dCharts(){Object.values(dCh).forEach(c=>c.destroy());dCh={};const d=dFl
     {label:'Diasens',data:dsD,backgroundColor:'#F0B839',borderRadius:4,maxBarThickness:28}
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{padding:12,boxWidth:12}},datalabels:{display:true,color:'#E4E8EF',font:{size:10,weight:600},formatter:v=>v||''}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#1C2330'},ticks:{stepSize:1}}}}});
 
-  // CGM donut
   const gfN=d.filter(r=>r.cgmType==='GoodFlip').length,dsN=d.filter(r=>r.cgmType==='Diasens').length;
-  dCh.cgm=new Chart(document.getElementById('dCGM'),{type:'doughnut',data:{labels:['GoodFlip','Diasens'],datasets:[{data:[gfN,dsN],backgroundColor:['#3EDBB0','#F0B839'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{padding:14}},datalabels:{color:'#fff',font:{size:14,weight:700},formatter:(v,c)=>v+' ('+Math.round(v/(gfN+dsN)*100)+'%)'}}}});
+  dCh.cgm=new Chart(document.getElementById('dCGM'),{type:'doughnut',data:{labels:['GoodFlip','Diasens'],datasets:[{data:[gfN,dsN],backgroundColor:['#3EDBB0','#F0B839'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{padding:14}},datalabels:{color:'#fff',font:{size:14,weight:700},formatter:(v,c)=>v+' ('+(gfN+dsN?Math.round(v/(gfN+dsN)*100):0)+'%)'}}}});
 
-  // Status donut
   const stC={};d.forEach(r=>{stC[r.status]=(stC[r.status]||0)+1;});const stK=Object.keys(stC).filter(k=>stC[k]);const stColors={'completed':'#3EDBB0','noshow':'#EF6B6B','canceled':'#F0B839','confirmed':'#5B9CF6'};
-  dCh.st=new Chart(document.getElementById('dSt'),{type:'doughnut',data:{labels:stK,datasets:[{data:stK.map(k=>stC[k]),backgroundColor:stK.map(k=>stColors[k]||'#6B7A8D'),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom'},datalabels:{color:'#fff',font:{size:13,weight:700},formatter:(v,c)=>v}}}});
+  dCh.st=new Chart(document.getElementById('dSt'),{type:'doughnut',data:{labels:stK,datasets:[{data:stK.map(k=>stC[k]),backgroundColor:stK.map(k=>stColors[k]||'#6B7A8D'),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom'},datalabels:{color:'#fff',font:{size:13,weight:700},formatter:v=>v}}}});
 
-  // Agent stacked by CGM
   const agS={};d.forEach(r=>{if(!r.agent)return;if(!agS[r.agent])agS[r.agent]={gf:0,ds:0};if(r.cgmType==='GoodFlip')agS[r.agent].gf++;else agS[r.agent].ds++;});const agN=Object.keys(agS);
   dCh.ag=new Chart(document.getElementById('dAg'),{type:'bar',data:{labels:agN,datasets:[
     {label:'GoodFlip',data:agN.map(a=>agS[a].gf),backgroundColor:'#3EDBB0',borderRadius:6},
     {label:'Diasens',data:agN.map(a=>agS[a].ds),backgroundColor:'#F0B839',borderRadius:6}
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{padding:10,boxWidth:12}},datalabels:{display:true,color:'#E4E8EF',font:{size:12,weight:700},formatter:v=>v||''}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#1C2330'},ticks:{stepSize:1}}}}});
 
-  // Agent completion rate
   const agR={};d.forEach(r=>{if(!r.agent)return;if(!agR[r.agent])agR[r.agent]={t:0,c:0};agR[r.agent].t++;if(r.status==='completed')agR[r.agent].c++;});const arN=Object.keys(agR);
   dCh.ar=new Chart(document.getElementById('dAR'),{type:'bar',data:{labels:arN,datasets:[{data:arN.map(a=>agR[a].t?Math.round(agR[a].c/agR[a].t*100):0),backgroundColor:arN.map(a=>agR[a].c/agR[a].t>.7?'#3EDBB0':'#F0B839'),borderRadius:8,maxBarThickness:64}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:true,color:'#E4E8EF',font:{size:14,weight:700},formatter:v=>v+'%'}},scales:{y:{beginAtZero:true,max:100,grid:{color:'#1C2330'}},x:{grid:{display:false}}}}});
 
-  // Platform
   const plat={};d.forEach(r=>{const p=r.platform||'Unknown';plat[p]=(plat[p]||0)+1;});const plK=Object.keys(plat);
   dCh.pl=new Chart(document.getElementById('dPl'),{type:'doughnut',data:{labels:plK,datasets:[{data:plK.map(k=>plat[k]),backgroundColor:['#5B9CF6','#F0B839','#B07CFA'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom'},datalabels:{color:'#fff',font:{size:13,weight:700},formatter:v=>v}}}});
 
-  // CGM × Status
   const csData={GoodFlip:{completed:0,noshow:0,canceled:0,confirmed:0},Diasens:{completed:0,noshow:0,canceled:0,confirmed:0}};
   d.forEach(r=>{const t=r.cgmType==='GoodFlip'?'GoodFlip':'Diasens';if(csData[t][r.status]!==undefined)csData[t][r.status]++;});
   dCh.cs=new Chart(document.getElementById('dCS'),{type:'bar',data:{labels:['GoodFlip','Diasens'],datasets:[
