@@ -73,7 +73,8 @@ th:hover{color:var(--accent)}td{padding:9px 12px;border-bottom:1px solid var(--b
 @media(max-width:900px){.topbar,.filters,.main,.main-tabs{padding-left:16px;padding-right:16px}.cg,.sum-grid{grid-template-columns:1fr}.top5-grid{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
 
-<div class="topbar"><div><h1>Customer Experience <span>Insights</span></h1></div><div class="meta"><div class="live"></div><span id="headerInfo">Loading...</span></div></div>
+<div class="topbar"><div><h1>Customer Experience <span>Insights</span></h1></div><div class="meta"><div class="live"></div><span id="headerInfo">Loading...</span><span style="margin-left:12px;font-size:10px;color:var(--muted);border-left:1px solid var(--border);padding-left:12px" id="lastUpdated"></span></div></div>
+<div style="padding:6px 36px 0;display:flex;align-items:center;gap:12px;font-size:10px;color:var(--muted)"><span>🔄 Data refreshes every <strong style="color:var(--accent)">Monday, Wednesday & Friday at 10:00 AM</strong></span></div>
 <div class="main-tabs">
 <button class="main-tab active" onclick="switchTab('freshdesk')">📋 Freshdesk</button>
 <button class="main-tab" onclick="switchTab('cgm')">💚 CGM Experience</button>
@@ -563,4 +564,5 @@ function oGp(p){oPg=p;oTbl();}
 
 // === INIT ===
 loadFD();loadDS();cBuildMonths();loadOZ();
+document.getElementById('lastUpdated').textContent='Last updated: '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+' at '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
 </script></body></html>
