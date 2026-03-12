@@ -202,20 +202,20 @@ th:hover{color:var(--accent)}td{padding:9px 12px;border-bottom:1px solid var(--b
 <!-- DIASENS SENSORS -->
 <div class="tab-content" id="tab-diasens">
 <div class="filters">
-<div class="fg"><span class="fg-label">Status</span><button class="fb active" data-dss="All">All</button><button class="fb" data-dss="CONNECTED">Connected</button><button class="fb" data-dss="DISCONNECTED">Disconnected</button><button class="fb" data-dss="EXPIRED">Expired</button><button class="fb" data-dss="TRANSMITTER_DISCONNECT">TX Disconnect</button><button class="fb" data-dss="BLUETOOTH_OFF">BT Off</button><button class="fb" data-dss="ERROR_COMMON">Error</button></div>
+
 <div class="fg" id="dsMG"><span class="fg-label">Month</span><button class="fb active" data-dsm="All">All</button></div>
 <div class="fg"><span class="fg-label">From</span><input type="date" class="di" id="dsDateFrom"><span class="fg-label" style="margin-left:6px">To</span><input type="date" class="di" id="dsDateTo"><button class="fb" style="margin-left:4px" onclick="dsClearDates()">✕</button></div>
 </div>
 <div class="main">
 <div id="dsC">
 <div class="kpi-row" id="dsK"></div>
-<div class="sec fade" id="dsSm"></div>
+
 
 <div class="sec fade" id="dsVirtual"></div>
 <div class="sec fade" id="dsReplComp"></div>
 <div class="sec fade" id="dsCross"></div>
 <div class="tc fade"><div class="tt"><div class="ct" style="margin:0">All Diasens CGM Users</div><input class="sb" placeholder="Search…" id="dsSr"></div>
-<div class="ts"><table><thead><tr><th data-dsk="name">User ↕</th><th data-dsk="phone">Phone ↕</th><th data-dsk="sensor">Sensor ID ↕</th><th data-dsk="status">Status ↕</th><th data-dsk="startDate">Start ↕</th><th data-dsk="endDate">End ↕</th><th data-dsk="days">Days ↕</th></tr></thead><tbody id="dsTb"></tbody></table></div>
+<div class="ts"><table><thead><tr><th data-dsk="name">User ↕</th><th data-dsk="phone">Phone ↕</th><th data-dsk="sensor">Sensor ID ↕</th><th data-dsk="startDate">Start ↕</th><th data-dsk="endDate">End ↕</th><th data-dsk="days">Days ↕</th></tr></thead><tbody id="dsTb"></tbody></table></div>
 <div class="pgn" id="dsPg"></div></div></div></div></div>
 
 <!-- REPLACEMENTS -->
@@ -276,7 +276,7 @@ th:hover{color:var(--accent)}td{padding:9px 12px;border-bottom:1px solid var(--b
 <th data-gfk="name">Name ↕</th>
 <th data-gfk="phone">Phone ↕</th>
 <th data-gfk="sensor">Sensor ID ↕</th>
-<th data-gfk="status">Status ↕</th>
+
 <th data-gfk="disease">Condition ↕</th>
 <th data-gfk="startDate">Start ↕</th>
 <th data-gfk="endDate">End ↕</th>
@@ -701,56 +701,27 @@ document.getElementById('headerInfo').textContent=dsFlt.length+' of '+dsAll.leng
 
 function dsKPI(){const d=dsFlt,n=d.length;
 const conn=d.filter(r=>r.status==='CONNECTED').length;
-const disc=d.filter(r=>r.status==='DISCONNECTED').length;
-const exp=d.filter(r=>r.status==='EXPIRED').length;
-const txd=d.filter(r=>r.status==='TRANSMITTER_DISCONNECT').length;
-const btOff=d.filter(r=>r.status==='BLUETOOTH_OFF').length;
-const err=d.filter(r=>r.status==='ERROR_COMMON').length;
-const avgDays=n?av(d.map(r=>r.days)).toFixed(1):'–';
-const uniqueUsers=[...new Set(d.map(r=>r.phone).filter(Boolean))].length;
+const issues=d.filter(r=>r.status!=='CONNECTED'&&r.status!=='EXPIRED').length;
+// DaySchedule virtual install match
+const dsData=typeof dAllRaw!=='undefined'&&dAllRaw.length?dAllRaw:DS_EMBED;
+const dsNames=new Set();
+dsData.filter(r=>r.status==='completed'&&r.cgmType==='Diasens').forEach(r=>{dsNames.add((r.invitee||'').toLowerCase().trim());});
+const virtualInstalled=d.filter(r=>r.name&&dsNames.has(r.name.toLowerCase().trim())).length;
+const notInDS=n-virtualInstalled;
+const virtualRate=n?(virtualInstalled/n*100).toFixed(1):'0';
+// Replacements
+const rpData=typeof rpAll!=='undefined'&&rpAll.length?rpAll:REPL_EMBED;
+const rpPhones=new Set(rpData.filter(r=>r.userFrom==='Diasens').map(r=>r.phone));
+const replaced=d.filter(r=>rpPhones.has(r.phone)).length;
 document.getElementById('dsK').innerHTML=[
-kp('Total Sensors',n,'All records'),
-kp('Connected',conn,n?'<span style="color:var(--green)">'+Math.round(conn/n*100)+'%</span>':''),
-kp('Disconnected',disc,n?Math.round(disc/n*100)+'%':''),
-kp('Expired',exp,''),
-kp('Unique Users',uniqueUsers,'')
+kp('Total Users',n,'Diasens CGM'),
+kp('Virtually Installed',virtualInstalled,'via DaySchedule'),
+kp('Not in DaySchedule',notInDS,'self / other install'),
+kp('Virtual Install Rate',virtualRate+'%',''),
+kp('Replacements Done',replaced,'Diasens users')
 ].join('');}
 
-function dsSum(){const d=dsFlt,n=d.length;
-const conn=d.filter(r=>r.status==='CONNECTED');
-const uniqueUsers=[...new Set(d.map(r=>r.phone).filter(Boolean))].length;
-// DaySchedule cross-match
-const dsData=typeof dAllRaw!=='undefined'?dAllRaw:DS_EMBED;
-const dsDiasens=dsData.filter(r=>r.cgmType==='Diasens'&&r.status!=='test');
-const dsTest=dsData.filter(r=>r.cgmType==='Diasens'&&r.status==='test');
-const dsCompleted=dsDiasens.filter(r=>r.status==='completed');
-// Match Diasens users who had virtual installation
-const dsPhones=new Set(d.map(r=>r.phone).filter(Boolean));
-const dsNames=new Set(d.map(r=>r.name.toLowerCase().trim()).filter(Boolean));
-const instMatches=[];
-dsData.forEach(r=>{if(r.cgmType!=='Diasens'||r.status==='test')return;
-const invLow=r.invitee.toLowerCase().trim();
-for(const dn of dsNames){if(invLow===dn||(invLow.length>4&&dn.length>4&&(invLow.includes(dn)||dn.includes(invLow)))){instMatches.push({dsName:r.invitee,date:r.date,dsStatus:r.status,agent:r.agent});break;}}});
-let h='<h2>📡 Sensor Health Summary</h2><div class="sum-grid">';
-h+='<div class="sc"><h3><span class="dot" style="background:var(--green)"></span>Sensor Overview</h3><ul>';
-h+='<li>Total sensors: <span class="hi">'+n+'</span></li>';
-h+='<li>Connected: <span class="hi">'+conn.length+'</span> ('+Math.round(conn.length/n*100)+'%)</li>';
-h+='<li>Disconnected: <span class="bd">'+d.filter(r=>r.status==='DISCONNECTED').length+'</span></li>';
-h+='<li>Expired: '+d.filter(r=>r.status==='EXPIRED').length+'</li>';
-h+='<li>Other issues: '+(n-conn.length-d.filter(r=>r.status==='DISCONNECTED').length-d.filter(r=>r.status==='EXPIRED').length)+'</li>';
-h+='<li>Unique users: <span class="hi">'+uniqueUsers+'</span></li>';
-h+='</ul></div>';
-h+='<div class="sc"><h3><span class="dot" style="background:var(--blue)"></span>Virtual Installation (DaySchedule)</h3><ul>';
-h+='<li>Diasens bookings: <span class="hi">'+dsDiasens.length+'</span> (excl. '+dsTest.length+' test)</li>';
-h+='<li>Completed installs: <span class="hi">'+dsCompleted.length+'</span></li>';
-if(instMatches.length>0){h+='<li>Diasens users with install: <span class="hi">'+instMatches.length+'</span></li>';instMatches.forEach(m=>{h+='<li style="font-size:11px">'+e(m.dsName)+' — '+m.date+' <span class="badge '+(m.dsStatus==='completed'?'b-g':'b-a')+'">'+m.dsStatus+'</span></li>';});}
-else{h+='<li style="color:var(--muted)">No direct user matches found</li>';}
-h+='</ul></div>';
-h+='<div class="sc"><h3><span class="dot" style="background:var(--amber)"></span>Status Breakdown</h3><ul>';
-const stC={};d.forEach(r=>{stC[r.status]=(stC[r.status]||0)+1;});
-Object.entries(stC).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{const c=k==='CONNECTED'?'hi':k==='DISCONNECTED'||k==='ERROR_COMMON'?'bd':'wr';h+='<li><span class="'+c+'">'+k.replace(/_/g,' ')+'</span>: '+v+'</li>';});
-h+='</ul></div></div>';
-document.getElementById('dsSm').innerHTML=h;}
+function dsSum(){const el=document.getElementById('dsSm');if(el)el.innerHTML='';}
 
 function dsVirtual(){
 const d=dsFlt;
@@ -763,12 +734,13 @@ d.forEach(r=>{
 const byName=r.name&&dsNameMap[r.name.toLowerCase().trim()];
 if(byName)matched.push({...r,dsAgent:byName.agent||'–',dsDate:byName.date||'–'});
 });
-let h='<h2>📹 Virtual Installation Status</h2>';
-h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Virtually Installed</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--accent)">'+matched.length+'</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Not in DaySchedule</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--amber)">'+(d.length-matched.length)+'</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Virtual Install Rate</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--blue)">'+(d.length?(matched.length/d.length*100).toFixed(1):0)+'%</div></div>';
-h+='</div>';
+let h='<h2>📹 Virtual Installation Details</h2>';
+if(matched.length){
+h+='<p style="color:var(--muted);font-size:12px;margin-bottom:12px"><span class="hi">'+matched.length+'</span> users matched with DaySchedule</p>';
+h+='<div class="ts" style="max-height:300px"><table><thead><tr><th>User</th><th>Phone</th><th>Agent</th><th>Install Date</th></tr></thead><tbody>';
+matched.forEach(m=>{h+='<tr><td style="font-weight:500">'+e(m.name)+'</td><td>'+e(m.phone)+'</td><td style="color:var(--accent)">'+e(m.dsAgent)+'</td><td>'+e(m.dsDate)+'</td></tr>';});
+h+='</tbody></table></div>';
+}else{h+='<p style="color:var(--muted);font-size:12px">No virtual installation matches found.</p>';}
 document.getElementById('dsVirtual').innerHTML=h;
 }
 
@@ -776,44 +748,38 @@ function dsReplComp(){
 const d=dsFlt;
 const rpData=typeof rpAll!=='undefined'&&rpAll.length?rpAll:REPL_EMBED;
 const dsRepl=rpData.filter(r=>r.userFrom==='Diasens');
-const gfRepl=rpData.filter(r=>r.userFrom==='GoodFlip');
 const dsMatched=[];
 d.forEach(r=>{
 const rp=dsRepl.filter(x=>x.phone===r.phone);
 if(rp.length)dsMatched.push({...r,replacements:rp});
 });
-let h='<h2>🔄 Replacement Comparison</h2>';
-h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Diasens Replacements</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--amber)">'+dsRepl.length+'</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">GoodFlip Replacements</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--accent)">'+gfRepl.length+'</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Current Users Replaced</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--red)">'+dsMatched.length+'</div></div>';
-h+='</div>';
+let h='<h2>🔄 Replacement Details</h2>';
 if(dsMatched.length){
-h+='<div class="ts" style="max-height:200px"><table><thead><tr><th>User</th><th>Phone</th><th>Replaced By</th><th>Approver</th><th>Date</th></tr></thead><tbody>';
+h+='<p style="color:var(--muted);font-size:12px;margin-bottom:12px"><span class="bd">'+dsMatched.length+'</span> users with replacements</p>';
+h+='<div class="ts" style="max-height:250px"><table><thead><tr><th>User</th><th>Phone</th><th>Replaced By</th><th>Approver</th><th>Date</th></tr></thead><tbody>';
 dsMatched.forEach(m=>{m.replacements.forEach(rp=>{
 h+='<tr><td style="font-weight:500">'+e(m.name)+'</td><td>'+e(m.phone)+'</td><td><span class="badge '+(rp.approvedBy==='Tracky'?'b-a':'b-g')+'">'+e(rp.approvedBy)+'</span></td><td>'+e(rp.approver)+'</td><td>'+e(rp.date)+'</td></tr>';
 });});
 h+='</tbody></table></div>';
-}
+}else{h+='<p style="color:var(--muted);font-size:12px">No replacements found for current users.</p>';}
 document.getElementById('dsReplComp').innerHTML=h;
 }
 
 function dsCross(){
 const fdData=typeof fAll!=='undefined'?fAll:FD_EMBED;
-const dsPhones={};dsFlt.forEach(r=>{if(!r.phone)return;if(!dsPhones[r.phone])dsPhones[r.phone]={name:r.name,statuses:[],sensors:[]};dsPhones[r.phone].statuses.push(r.status);dsPhones[r.phone].sensors.push(r.sensor);});
+const dsPhones={};dsFlt.forEach(r=>{if(!r.phone)return;if(!dsPhones[r.phone])dsPhones[r.phone]={name:r.name,sensors:[]};dsPhones[r.phone].sensors.push(r.sensor);});
 const matches=[];
 Object.entries(dsPhones).forEach(([phone,info])=>{
 const fdTickets=fdData.filter(r=>r.regNum===phone||(r.summary&&r.summary.includes(phone))||(r.requester&&r.requester.includes(phone)));
-if(fdTickets.length>0)matches.push({phone,name:info.name,statuses:info.statuses,tickets:fdTickets});});
+if(fdTickets.length>0)matches.push({phone,name:info.name,tickets:fdTickets});});
 let h='<h2>🔗 Diasens Users with Freshdesk Tickets</h2>';
 if(matches.length===0){h+='<p style="color:var(--muted);font-size:12px">No Diasens users found with matching Freshdesk tickets in current filter.</p>';}
 else{
 h+='<p style="color:var(--muted);font-size:12px;margin-bottom:12px"><span style="color:var(--amber);font-weight:600">'+matches.length+'</span> Diasens users have also raised support tickets</p>';
-h+='<div class="ts" style="max-height:350px"><table><thead><tr><th>User</th><th>Phone</th><th>Sensor Status</th><th>Tickets</th><th>Ticket Details</th></tr></thead><tbody>';
+h+='<div class="ts" style="max-height:350px"><table><thead><tr><th>User</th><th>Phone</th><th>Tickets</th><th>Ticket Details</th></tr></thead><tbody>';
 matches.forEach(m=>{
-const stBadges=m.statuses.map(s=>{const c=s==='CONNECTED'?'b-g':s==='DISCONNECTED'||s==='ERROR_COMMON'?'b-r':s==='EXPIRED'?'b-m':'b-a';return'<span class="badge '+c+'" style="margin-right:3px">'+s.replace(/_/g,' ')+'</span>';}).join('');
 const tkDetails=m.tickets.slice(0,3).map(t=>'<span style="color:var(--accent)">#'+t.id+'</span> '+e(t.level3||'').slice(0,30)+' <span class="badge '+(t.status==='Closed'?'b-g':'b-a')+'">'+t.status+'</span>').join('<br>');
-h+='<tr><td style="font-weight:500">'+e(m.name)+'</td><td style="color:var(--amber)">'+m.phone+'</td><td>'+stBadges+'</td><td style="font-weight:700;color:var(--red)">'+m.tickets.length+'</td><td style="font-size:11px;white-space:normal;max-width:350px">'+tkDetails+'</td></tr>';});
+h+='<tr><td style="font-weight:500">'+e(m.name)+'</td><td style="color:var(--amber)">'+m.phone+'</td><td style="font-weight:700;color:var(--red)">'+m.tickets.length+'</td><td style="font-size:11px;white-space:normal;max-width:350px">'+tkDetails+'</td></tr>';});
 h+='</tbody></table></div>';}
 document.getElementById('dsCross').innerHTML=h;}
 
@@ -821,7 +787,7 @@ function dsTbl(){const q=document.getElementById('dsSr').value.toLowerCase();let
 r.sort((a,b)=>{let va=a[dsSk],vb=b[dsSk];if(dsSk==='days'){va=+va;vb=+vb;}if(va<vb)return dsSa?-1:1;if(va>vb)return dsSa?1:-1;return 0;});
 const tp=Math.ceil(r.length/dsPS)||1;if(dsPg>tp)dsPg=tp;const s=(dsPg-1)*dsPS,p=r.slice(s,s+dsPS);
 const stB=s=>s==='CONNECTED'?'b-g':s==='DISCONNECTED'||s==='ERROR_COMMON'?'b-r':s==='EXPIRED'?'b-m':'b-a';
-document.getElementById('dsTb').innerHTML=p.map(r=>'<tr><td style="color:var(--accent);font-weight:500">'+e(r.name)+'</td><td>'+e(r.phone)+'</td><td style="font-size:10px" title="'+e(r.sensor)+'">'+e(r.sensor)+'</td><td><span class="badge '+stB(r.status)+'">'+r.status.replace(/_/g,' ')+'</span></td><td>'+e(r.startDate)+'</td><td>'+e(r.endDate)+'</td><td style="font-weight:600">'+r.days+'</td></tr>').join('');pgn('dsPg',tp,dsPg,'dsGp');}
+document.getElementById('dsTb').innerHTML=p.map(r=>'<tr><td style="color:var(--accent);font-weight:500">'+e(r.name)+'</td><td>'+e(r.phone)+'</td><td style="font-size:10px" title="'+e(r.sensor)+'">'+e(r.sensor)+'</td><td>'+e(r.startDate)+'</td><td>'+e(r.endDate)+'</td><td style="font-weight:600">'+r.days+'</td></tr>').join('');pgn('dsPg',tp,dsPg,'dsGp');}
 function dsGp(p){dsPg=p;dsTbl();}
 
 // ==================== REPLACEMENTS ====================
@@ -959,7 +925,7 @@ function gfKPI(){
 const d=gfFlt,n=d.length;
 const conn=d.filter(r=>r.status==='CONNECTED').length;
 const issues=d.filter(r=>r.status!=='CONNECTED'&&r.status!=='EXPIRED').length;
-// Match with DaySchedule for virtual installations
+// DaySchedule virtual install match
 const dsData=typeof dAllRaw!=='undefined'&&dAllRaw.length?dAllRaw:DS_EMBED;
 const dsPhones=new Set();const dsNames=new Set();
 dsData.filter(r=>r.status==='completed'&&r.cgmType==='GoodFlip').forEach(r=>{
@@ -967,19 +933,19 @@ if(/^\d{10,}$/.test(r.invitee))dsPhones.add(r.invitee);
 dsNames.add((r.invitee||'').toLowerCase().trim());
 });
 const virtualInstalled=d.filter(r=>dsPhones.has(r.phone)||(r.name&&dsNames.has(r.name.toLowerCase().trim()))).length;
-// Match with Replacements
+const notInDS=n-virtualInstalled;
+const virtualRate=n?(virtualInstalled/n*100).toFixed(1):'0';
+// Replacements
 const rpData=typeof rpAll!=='undefined'&&rpAll.length?rpAll:REPL_EMBED;
 const rpPhones=new Set(rpData.filter(r=>r.userFrom==='GoodFlip').map(r=>r.phone));
 const replaced=d.filter(r=>rpPhones.has(r.phone)).length;
-
 document.getElementById('gfK').innerHTML=[
 kp('Total Users',n,'GoodFlip CGM'),
-kp('Virtual Installs',virtualInstalled,'via DaySchedule'),
-kp('Replacements Done',replaced,'GoodFlip users'),
-kp('Active (Connected)',conn,'of '+n+' users'),
-kp('Needs Attention',issues,'Non-expired issues')
-].join('');
-}
+kp('Virtually Installed',virtualInstalled,'via DaySchedule'),
+kp('Not in DaySchedule',notInDS,'self / other install'),
+kp('Virtual Install Rate',virtualRate+'%',''),
+kp('Replacements Done',replaced,'GoodFlip users')
+].join('');}
 
 function gfSum(){
 const d=gfFlt,n=d.length;
@@ -1012,26 +978,22 @@ dsCompleted.forEach(r=>{
 if(/^\d{10,}$/.test(r.invitee))dsPhones.add(r.invitee);
 dsNameMap[(r.invitee||'').toLowerCase().trim()]=r;
 });
-const matched=[];const unmatched=[];
+const matched=[];
 d.forEach(r=>{
 const byPhone=dsPhones.has(r.phone);
 const byName=r.name&&dsNameMap[r.name.toLowerCase().trim()];
 if(byPhone||byName){
 const dsRec=byName||dsCompleted.find(x=>x.invitee===r.phone);
 matched.push({...r,dsAgent:dsRec?.agent||'–',dsDate:dsRec?.date||'–',dsPlatform:dsRec?.platform||'–'});
-}else{unmatched.push(r);}
+}
 });
-let h='<h2>📹 Virtual Installation Status</h2>';
-h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Virtually Installed</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--accent)">'+matched.length+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">via DaySchedule</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Not Found in DaySchedule</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--amber)">'+unmatched.length+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">self / other install</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Virtual Install Rate</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--blue)">'+(d.length?(matched.length/d.length*100).toFixed(1):0)+'%</div></div>';
-h+='</div>';
+let h='<h2>📹 Virtual Installation Details</h2>';
 if(matched.length){
+h+='<p style="color:var(--muted);font-size:12px;margin-bottom:12px"><span class="hi">'+matched.length+'</span> users matched with DaySchedule</p>';
 h+='<div class="ts" style="max-height:300px"><table><thead><tr><th>User</th><th>Phone</th><th>Agent</th><th>Install Date</th><th>Platform</th></tr></thead><tbody>';
 matched.forEach(m=>{h+='<tr><td style="font-weight:500">'+e(m.name)+'</td><td>'+e(m.phone)+'</td><td style="color:var(--accent)">'+e(m.dsAgent)+'</td><td>'+e(m.dsDate)+'</td><td>'+e(m.dsPlatform)+'</td></tr>';});
 h+='</tbody></table></div>';
-}
+}else{h+='<p style="color:var(--muted);font-size:12px">No virtual installation matches found.</p>';}
 document.getElementById('gfVirtual').innerHTML=h;
 }
 
@@ -1039,25 +1001,20 @@ function gfReplComp(){
 const d=gfFlt;
 const rpData=typeof rpAll!=='undefined'&&rpAll.length?rpAll:REPL_EMBED;
 const gfRepl=rpData.filter(r=>r.userFrom==='GoodFlip');
-const dsRepl=rpData.filter(r=>r.userFrom==='Diasens');
 const gfMatched=[];
 d.forEach(r=>{
 const rp=gfRepl.filter(x=>x.phone===r.phone);
 if(rp.length)gfMatched.push({...r,replacements:rp});
 });
-let h='<h2>🔄 Replacement Comparison</h2>';
-h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">GoodFlip Replacements</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--accent)">'+gfRepl.length+'</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Diasens Replacements</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--amber)">'+dsRepl.length+'</div></div>';
-h+='<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Current Users Replaced</div><div style="font-family:Fraunces,serif;font-size:32px;color:var(--red)">'+gfMatched.length+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">of '+d.length+' filtered users</div></div>';
-h+='</div>';
+let h='<h2>🔄 Replacement Details</h2>';
 if(gfMatched.length){
+h+='<p style="color:var(--muted);font-size:12px;margin-bottom:12px"><span class="bd">'+gfMatched.length+'</span> users with replacements</p>';
 h+='<div class="ts" style="max-height:250px"><table><thead><tr><th>User</th><th>Phone</th><th>Replaced By</th><th>Approver</th><th>Date</th></tr></thead><tbody>';
 gfMatched.forEach(m=>{m.replacements.forEach(rp=>{
 h+='<tr><td style="font-weight:500">'+e(m.name)+'</td><td>'+e(m.phone)+'</td><td><span class="badge '+(rp.approvedBy==='Tracky'?'b-a':'b-g')+'">'+e(rp.approvedBy)+'</span></td><td>'+e(rp.approver)+'</td><td>'+e(rp.date)+'</td></tr>';
 });});
 h+='</tbody></table></div>';
-}
+}else{h+='<p style="color:var(--muted);font-size:12px">No replacements found for current users.</p>';}
 document.getElementById('gfReplComp').innerHTML=h;
 }
 
@@ -1097,7 +1054,7 @@ if(gfPg>tp)gfPg=tp;
 const s=(gfPg-1)*gfPS,p=r.slice(s,s+gfPS);
 const stC2={'CONNECTED':'b-c','DISCONNECTED':'b-o','EXPIRED':'b-w','TRANSMITTER_DISCONNECT':'b-n','BLUETOOTH_OFF':'b-t','ERROR_COMMON':'b-o','WEAK_SIGNAL':'b-w'};
 document.getElementById('gfTb').innerHTML=p.map(r=>{
-return '<tr><td style="font-weight:500;color:var(--blue)">'+e(r.name)+'</td><td>'+e(r.phone)+'</td><td style="font-size:11px">'+e(r.sensor)+'</td><td><span class="badge '+(stC2[r.status]||'b-w')+'">'+e(r.status)+'</span></td><td>'+e(r.diseaseLabel)+'</td><td>'+e(r.startDate?.slice(0,10)||'')+'</td><td>'+e(r.endDate?.slice(0,10)||'')+'</td></tr>';
+return '<tr><td style="font-weight:500;color:var(--blue)">'+e(r.name)+'</td><td>'+e(r.phone)+'</td><td style="font-size:11px">'+e(r.sensor)+'</td><td>'+e(r.diseaseLabel)+'</td><td>'+e(r.startDate?.slice(0,10)||'')+'</td><td>'+e(r.endDate?.slice(0,10)||'')+'</td></tr>';
 }).join('');
 pgn('gfPg',tp,gfPg,'gfGp');
 }
